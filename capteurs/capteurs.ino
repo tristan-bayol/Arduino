@@ -7,20 +7,28 @@
 #include <Adafruit_Sensor.h>
 #include "SHCSR04.h"
 
+// Ecran
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-Adafruit_BME280 bme;
-Adafruit_MPU6050 mpu;
 
+// Bandeau Led
 #define LED_PIN     13
 #define LED_COUNT  16
 #define BRIGHTNESS 50
-
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
+// Capteur Météo
+Adafruit_BME280 bme;
+// Gyroscope
+Adafruit_MPU6050 mpu;
+// Capteur de distance
 SHCSR04 hcsr04;
+// Capteur de mouvement + led
+int ledPin = 25; // pin de la led
+int sensorPin = 34; // pin du capteur
+int ledState = LOW; // valeur par default pas de mouvement
+int val = 0; // variable to store the sensor status (value)
 
 enum DisplayMode {
   TEMPERATURE,
@@ -31,6 +39,7 @@ enum DisplayMode {
 DisplayMode currentMode = TEMPERATURE;
 
 void setup() {
+  Serial.println("Setup completed");
   Wire.begin();
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -56,13 +65,16 @@ void setup() {
   strip.begin();
   strip.setBrightness(BRIGHTNESS);
   strip.show();
+  
+  pinMode(ledPin, OUTPUT);      // initalize LED as an output
+  pinMode(sensorPin, INPUT);    // initialize sensor as an input
 
   Serial.begin(9600);  // Initialisation de la communication série pour le capteur de distance
 }
 
 void loop() {
   // Mesure de la distance avec le capteur HC-SR04
-  unsigned int distance = hcsr04.read(32, 34); // Assurez-vous d'utiliser les broches appropriées pour le déclencheur (trigger) et l'écho (echo)
+  unsigned int distance = hcsr04.read(32, 35); // Assurez-vous d'utiliser les broches appropriées pour le déclencheur (trigger) et l'écho (echo)
 
   // Vérifier si la distance est inférieure à 10 cm
   if (distance < 10) {
@@ -107,12 +119,20 @@ void loop() {
     controlLEDs(0, 0, 0, 0, 0, 0); // Éteindre les LEDs
   }
 
+  // Vérification de la détection de mouvement
+  val = digitalRead(sensorPin);
+  Serial.println("Value of val: " + String(val)); // Afficher la valeur de val dans le terminal
+  if (val == HIGH) {
+    digitalWrite(ledPin, HIGH); // Allumer la LED
+  } else {
+    digitalWrite(ledPin, LOW); // Éteindre la LED
+  }
+
   // Passer à la prochaine mode d'affichage
   currentMode = static_cast<DisplayMode>((currentMode + 1) % 3);
 
   delay(1000); // Attendre 1 seconde avant la prochaine itération
 }
-
 
 void displayAll(unsigned int distance, float angle) {
   display.clearDisplay();
@@ -145,4 +165,5 @@ void controlLEDs(float value, float minValue, float maxValue, uint8_t red, uint8
     }
   }
   strip.show();
+
 }
